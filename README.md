@@ -1,6 +1,6 @@
-# AppifyLab Backend
+# Buddy Script Backend
 
-FastAPI API for the AppifyLab full-stack engineer task. Uses **NeonDB** (serverless PostgreSQL).
+FastAPI API for the Buddy Script social app (AppifyLab full-stack engineer task). Uses **NeonDB** (serverless PostgreSQL).
 
 ## Prerequisites
 
@@ -40,13 +40,36 @@ fastapi dev app/main.py
 
 API runs at `http://localhost:8000`. Interactive docs: `http://localhost:8000/docs`.
 
+## Database migrations
+
+Requires `DATABASE_URL` in `.env` pointing to your Neon database.
+
+```bash
+# Apply all migrations
+alembic upgrade head
+
+# Create a new migration after model changes
+alembic revision --autogenerate -m "describe change"
+```
+
 ## Health check
 
 ```bash
-curl http://localhost:8000/api/health
+curl http://localhost:8000/api/v1/health
 ```
 
 Returns `status: ok` when the database is reachable, or `degraded` if Neon is not configured yet.
+
+## Auth API (JWT in httpOnly cookies)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/api/v1/auth/register` | Create account (first name, last name, email, password) |
+| `POST` | `/api/v1/auth/login` | Sign in |
+| `POST` | `/api/v1/auth/logout` | Clear auth cookie |
+| `GET` | `/api/v1/auth/me` | Current user (requires cookie) |
+
+Tokens are signed JWTs stored in an httpOnly cookie — not session rows in the database.
 
 ## Environment variables
 
@@ -61,10 +84,18 @@ Returns `status: ok` when the database is reachable, or `degraded` if Neon is no
 
 ```
 backend/
+├── alembic/              # Database migrations
 ├── app/
-│   ├── main.py       # FastAPI app entry
-│   ├── config.py     # Settings from .env
-│   └── database.py   # SQLAlchemy + Neon connection
+│   ├── main.py           # FastAPI app entry
+│   ├── config.py         # Settings from .env
+│   ├── database.py       # SQLAlchemy + Neon connection
+│   ├── deps.py           # Auth dependencies (get_current_user)
+│   ├── security.py       # Password hashing + JWT helpers
+│   ├── routers/
+│   │   ├── v1.py         # /api/v1 router (health + versioned routes)
+│   │   └── auth.py       # Register, login, logout, me
+│   └── models/
+│       └── user.py       # User model (auth)
 ├── requirements.txt
 └── .env.example
 ```
