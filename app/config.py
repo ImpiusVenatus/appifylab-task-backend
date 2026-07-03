@@ -7,7 +7,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     # App
-    app_name: str = "AppifyLab API"
+    app_name: str = "Buddy Script"
     debug: bool = False
 
     # Server
