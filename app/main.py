@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
-from app.database import check_database_connection
+from app.routers import v1
 
 settings = get_settings()
 
@@ -19,11 +19,4 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
-@app.get("/api/health")
-def health_check() -> dict:
-    db_ok = check_database_connection()
-    return {
-        "status": "ok" if db_ok else "degraded",
-        "database": "connected" if db_ok else "disconnected",
-    }
+app.include_router(v1.router)
