@@ -31,6 +31,13 @@ class Settings(BaseSettings):
     cookie_httponly: bool = True
     cookie_samesite: str = "lax"  # "lax" | "strict" | "none"
 
+    # Cloudinary (image uploads — free tier works for development)
+    cloudinary_cloud_name: str = ""
+    cloudinary_api_key: str = ""
+    cloudinary_api_secret: str = ""
+    cloudinary_folder: str = "appifylab/posts"
+    max_upload_size_mb: int = 5
+
 
 @lru_cache
 def get_settings() -> Settings:
