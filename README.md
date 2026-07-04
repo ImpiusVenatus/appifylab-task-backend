@@ -82,6 +82,15 @@ Requires auth cookie. Images are stored on [Cloudinary](https://cloudinary.com) 
 
 `visibility` is `public` (everyone) or `private` (author only).
 
+## Comments API
+
+Requires auth cookie. Replies use the same create endpoint with `parent_id` set.
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/v1/posts/{post_id}/comments` | List comments and nested replies for a post |
+| `POST` | `/api/v1/posts/{post_id}/comments` | Create a comment or reply (`content`, optional `parent_id`) |
+
 ## Environment variables
 
 | Variable | Description |
