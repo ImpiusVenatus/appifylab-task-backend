@@ -10,11 +10,11 @@ from app.database import get_db
 from app.deps import get_current_user
 from app.models.comment import Comment
 from app.models.enums import LikeTargetType, PostVisibility
-from app.models.like import Like
 from app.models.post import Post
 from app.models.user import User
 from app.schemas.post import PostListResponse, PostResponse
 from app.services.cloudinary import upload_post_image
+from app.services.likes import get_like_counts, get_liked_by_me
 
 router = APIRouter(tags=["posts"])
 
@@ -110,26 +110,8 @@ def list_posts(
 
     post_ids = [post.id for post in posts]
 
-    like_counts = dict(
-        db.execute(
-            select(Like.target_id, func.count())
-            .where(
-                Like.target_type == LikeTargetType.POST.value,
-                Like.target_id.in_(post_ids),
-            )
-            .group_by(Like.target_id)
-        ).all()
-    )
-
-    my_likes = set(
-        db.scalars(
-            select(Like.target_id).where(
-                Like.user_id == current_user.id,
-                Like.target_type == LikeTargetType.POST.value,
-                Like.target_id.in_(post_ids),
-            )
-        ).all()
-    )
+    like_counts = get_like_counts(db, LikeTargetType.POST, post_ids)
+    my_likes = get_liked_by_me(db, LikeTargetType.POST, post_ids, current_user.id)
 
     comment_counts = dict(
         db.execute(

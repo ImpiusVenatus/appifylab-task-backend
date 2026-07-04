@@ -91,6 +91,18 @@ Requires auth cookie. Replies use the same create endpoint with `parent_id` set.
 | `GET` | `/api/v1/posts/{post_id}/comments` | List comments and nested replies for a post |
 | `POST` | `/api/v1/posts/{post_id}/comments` | Create a comment or reply (`content`, optional `parent_id`) |
 
+## Likes API
+
+Requires auth cookie. Works for posts and comments (including replies).
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/api/v1/likes` | Like a post or comment (`target_type`, `target_id`) |
+| `DELETE` | `/api/v1/likes` | Unlike a post or comment (same JSON body) |
+| `GET` | `/api/v1/likes?target_type=post&target_id={uuid}` | Paginated list of users who liked (`limit`, `offset`) |
+
+`target_type` is `post` or `comment`.
+
 ## Environment variables
 
 | Variable | Description |
@@ -116,7 +128,9 @@ backend/
 │   ├── routers/
 │   │   ├── v1.py         # /api/v1 router (health + versioned routes)
 │   │   ├── auth.py       # Register, login, logout, me
-│   │   └── posts.py      # Create and list posts
+│   │   ├── posts.py      # Create and list posts
+│   │   ├── comments.py   # Comments and replies
+│   │   └── likes.py      # Like/unlike and who-liked (via likes router)
 │   ├── services/
 │   │   └── cloudinary.py # Image upload helper
 │   └── models/

@@ -1,13 +1,14 @@
 from fastapi import APIRouter
 
 from app.database import check_database_connection
-from app.routers import auth, comments, posts
+from app.routers import auth, comments, likes, posts
 
 router = APIRouter(prefix="/api/v1")
 
 router.include_router(auth.router, prefix="/auth", tags=["auth"])
 router.include_router(posts.router, prefix="/posts", tags=["posts"])
 router.include_router(comments.router, prefix="/posts", tags=["comments"])
+router.include_router(likes.router, tags=["likes"])
 
 
 @router.get("/health")
