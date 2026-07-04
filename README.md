@@ -71,6 +71,17 @@ Returns `status: ok` when the database is reachable, or `degraded` if Neon is no
 
 Tokens are signed JWTs stored in an httpOnly cookie — not session rows in the database.
 
+## Posts API
+
+Requires auth cookie. Images are stored on [Cloudinary](https://cloudinary.com) (free tier works for local development).
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/api/v1/posts` | Create a post (`multipart/form-data`: `content`, `visibility`, optional `image`) |
+| `GET` | `/api/v1/posts` | Paginated feed (`limit`, `offset`) — public posts plus your private posts |
+
+`visibility` is `public` (everyone) or `private` (author only).
+
 ## Environment variables
 
 | Variable | Description |
@@ -79,6 +90,8 @@ Tokens are signed JWTs stored in an httpOnly cookie — not session rows in the 
 | `DATABASE_URL` | Neon PostgreSQL connection string |
 | `JWT_SECRET` | Secret for signing tokens (auth phases) |
 | `COOKIE_*` | httpOnly cookie settings for JWT auth |
+| `CLOUDINARY_*` | Cloudinary credentials for post image uploads |
+| `MAX_UPLOAD_SIZE_MB` | Max image upload size (default `5`) |
 
 ## Project structure
 
@@ -93,9 +106,15 @@ backend/
 │   ├── security.py       # Password hashing + JWT helpers
 │   ├── routers/
 │   │   ├── v1.py         # /api/v1 router (health + versioned routes)
-│   │   └── auth.py       # Register, login, logout, me
+│   │   ├── auth.py       # Register, login, logout, me
+│   │   └── posts.py      # Create and list posts
+│   ├── services/
+│   │   └── cloudinary.py # Image upload helper
 │   └── models/
-│       └── user.py       # User model (auth)
+│       ├── user.py       # User model (auth)
+│       ├── post.py       # Post model
+│       ├── comment.py    # Comment + reply model
+│       └── like.py       # Polymorphic likes
 ├── requirements.txt
 └── .env.example
 ```
