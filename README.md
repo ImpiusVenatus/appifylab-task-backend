@@ -1,13 +1,27 @@
 # Buddy Script Backend
 
-FastAPI API for the Buddy Script social app (AppifyLab full-stack engineer task). Uses **NeonDB** (serverless PostgreSQL).
+FastAPI API for the **Buddy Script** social feed (AppifyLab full-stack engineer task).
+
+Stack: **FastAPI**, **SQLAlchemy**, **Neon/Railway PostgreSQL**, **JWT httpOnly cookies**, **Cloudinary** for images.
+
+## Features
+
+- User registration and login (first name, last name, email, password)
+- JWT auth stored in httpOnly cookies
+- Profile avatar upload (Cloudinary)
+- Posts with text, optional image, public/private visibility
+- Paginated feed (newest first)
+- Comments and nested replies
+- Likes on posts and comments, with who-liked listing
+- Delete own posts; delete own comments or comments on your posts
 
 ## Prerequisites
 
-- Python 3.11+
-- A [Neon](https://neon.tech) project with a PostgreSQL connection string
+- Python 3.11+ (3.12 recommended)
+- PostgreSQL database ([Neon](https://neon.tech) or Railway Postgres)
+- [Cloudinary](https://cloudinary.com) account (free tier works)
 
-## Setup
+## Local setup
 
 ```bash
 cd backend
@@ -23,121 +37,186 @@ pip install -r requirements.txt
 cp .env.example .env
 ```
 
-Edit `.env` and set `DATABASE_URL` to your Neon connection string.
+Edit `.env`:
 
-## Run
+1. Set `DATABASE_URL` to your Postgres connection string.
+2. Set `JWT_SECRET` to a long random string.
+3. Set Cloudinary credentials for image uploads.
+
+Apply migrations and start the API:
 
 ```bash
+alembic upgrade head
 fastapi dev app/main.py
 ```
 
-On Windows, if you see a `UnicodeEncodeError` from the FastAPI CLI, run with UTF-8 enabled:
+API: `http://localhost:8000`  
+Swagger docs: `http://localhost:8000/docs`
+
+On Windows, if the FastAPI CLI hits a Unicode error:
 
 ```bash
 set PYTHONUTF8=1
 fastapi dev app/main.py
 ```
 
-API runs at `http://localhost:8000`. Interactive docs: `http://localhost:8000/docs`.
+## Deploy on Railway
+
+1. Create a new Railway project and connect this repository.
+2. Set the **Root Directory** to `backend` (important — the FastAPI app lives in `app/`).
+3. Add environment variables from `.env.example` (see production section below).
+4. Railway reads `railway.toml` and runs:
+   - `alembic upgrade head`
+   - `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+5. Health check: `GET /api/v1/health`
+
+`Procfile` and `runtime.txt` are included as fallbacks for other PaaS hosts.
+
+### Production environment variables
+
+| Variable | Example | Notes |
+|----------|---------|-------|
+| `DATABASE_URL` | `postgresql://...` | Neon or Railway Postgres |
+| `JWT_SECRET` | long random string | Required |
+| `FRONTEND_URL` | `https://your-app.vercel.app` | Primary frontend origin |
+| `CORS_ALLOWED_ORIGINS` | `https://your-app.vercel.app` | Comma-separated if you have preview URLs too |
+| `COOKIE_SECURE` | `true` | Required over HTTPS |
+| `COOKIE_SAMESITE` | `none` | Required when frontend and API are on different domains |
+| `CLOUDINARY_*` | from Cloudinary dashboard | Required for uploads |
+
+Set the frontend `NEXT_PUBLIC_API_URL` to your Railway public URL (e.g. `https://your-api.up.railway.app`).
+
+### CORS
+
+The API allows credentialed requests from origins listed in `CORS_ALLOWED_ORIGINS`. If that variable is empty, only `FRONTEND_URL` is allowed.
+
+For local dev:
+
+```env
+FRONTEND_URL=http://localhost:3000
+COOKIE_SECURE=false
+COOKIE_SAMESITE=lax
+```
+
+For Vercel + Railway:
+
+```env
+FRONTEND_URL=https://your-app.vercel.app
+CORS_ALLOWED_ORIGINS=https://your-app.vercel.app
+COOKIE_SECURE=true
+COOKIE_SAMESITE=none
+```
 
 ## Database migrations
 
-Requires `DATABASE_URL` in `.env` pointing to your Neon database.
-
 ```bash
-# Apply all migrations
 alembic upgrade head
-
-# Create a new migration after model changes
-alembic revision --autogenerate -m "describe change"
+alembic revision --autogenerate -m "describe change"   # after model changes
 ```
 
-## Health check
+Migrations:
 
-```bash
-curl http://localhost:8000/api/v1/health
-```
-
-Returns `status: ok` when the database is reachable, or `degraded` if Neon is not configured yet.
-
-## Auth API (JWT in httpOnly cookies)
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `POST` | `/api/v1/auth/register` | Create account (first name, last name, email, password) |
-| `POST` | `/api/v1/auth/login` | Sign in |
-| `POST` | `/api/v1/auth/logout` | Clear auth cookie |
-| `GET` | `/api/v1/auth/me` | Current user (requires cookie) |
-
-Tokens are signed JWTs stored in an httpOnly cookie — not session rows in the database.
-
-## Posts API
-
-Requires auth cookie. Images are stored on [Cloudinary](https://cloudinary.com) (free tier works for local development).
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `POST` | `/api/v1/posts` | Create a post (`multipart/form-data`: `content`, `visibility`, optional `image`) |
-| `GET` | `/api/v1/posts` | Paginated feed (`limit`, `offset`) — public posts plus your private posts |
-
-`visibility` is `public` (everyone) or `private` (author only).
-
-## Comments API
-
-Requires auth cookie. Replies use the same create endpoint with `parent_id` set.
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/api/v1/posts/{post_id}/comments` | List comments and nested replies for a post |
-| `POST` | `/api/v1/posts/{post_id}/comments` | Create a comment or reply (`content`, optional `parent_id`) |
-
-## Likes API
-
-Requires auth cookie. Works for posts and comments (including replies).
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `POST` | `/api/v1/likes` | Like a post or comment (`target_type`, `target_id`) |
-| `DELETE` | `/api/v1/likes` | Unlike a post or comment (same JSON body) |
-| `GET` | `/api/v1/likes?target_type=post&target_id={uuid}` | Paginated list of users who liked (`limit`, `offset`) |
-
-`target_type` is `post` or `comment`.
-
-## Environment variables
-
-| Variable | Description |
+| Revision | Description |
 |----------|-------------|
-| `FRONTEND_URL` | Next.js origin for CORS (default `http://localhost:3000`) |
-| `DATABASE_URL` | Neon PostgreSQL connection string |
-| `JWT_SECRET` | Secret for signing tokens (auth phases) |
-| `COOKIE_*` | httpOnly cookie settings for JWT auth |
-| `CLOUDINARY_*` | Cloudinary credentials for post image uploads |
-| `MAX_UPLOAD_SIZE_MB` | Max image upload size (default `5`) |
+| `001_create_users` | Users table |
+| `002_create_feed_tables` | Posts, comments, likes |
+| `003_add_user_avatar` | `avatar_url`, `avatar_public_id` on users |
+
+## API reference
+
+All routes are under `/api/v1`. Protected routes require the `access_token` httpOnly cookie.
+
+### Health
+
+| Method | Endpoint | Auth |
+|--------|----------|------|
+| `GET` | `/health` | No |
+
+### Auth
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/auth/register` | Create account |
+| `POST` | `/auth/login` | Sign in (sets cookie) |
+| `POST` | `/auth/logout` | Clear cookie |
+| `GET` | `/auth/me` | Current user |
+| `POST` | `/auth/me/avatar` | Upload profile photo (`multipart/form-data`, field `avatar`) |
+
+### Posts
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/posts` | Create post (`multipart/form-data`: `content`, `visibility`, optional `image`) |
+| `GET` | `/posts` | Feed (`limit`, `offset`) — public posts + your private posts |
+| `DELETE` | `/posts/{post_id}` | Delete own post (removes Cloudinary image if present) |
+
+`visibility`: `public` | `private`
+
+### Comments
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/posts/{post_id}/comments` | List comments and replies |
+| `POST` | `/posts/{post_id}/comments` | Create comment or reply (`content`, optional `parent_id`) |
+| `DELETE` | `/posts/{post_id}/comments/{comment_id}` | Delete comment (author or post owner) |
+
+### Likes
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/likes` | Like post or comment (`target_type`, `target_id`) |
+| `DELETE` | `/likes` | Unlike (same JSON body) |
+| `GET` | `/likes?target_type=&target_id=` | Who liked (`limit`, `offset`) |
+
+`target_type`: `post` | `comment`
 
 ## Project structure
 
 ```
 backend/
-├── alembic/              # Database migrations
+├── alembic/                 # Database migrations
 ├── app/
-│   ├── main.py           # FastAPI app entry
-│   ├── config.py         # Settings from .env
-│   ├── database.py       # SQLAlchemy + Neon connection
-│   ├── deps.py           # Auth dependencies (get_current_user)
-│   ├── security.py       # Password hashing + JWT helpers
+│   ├── main.py              # FastAPI app + CORS
+│   ├── config.py            # Settings from environment
+│   ├── database.py          # SQLAlchemy engine
+│   ├── security.py          # Password hashing + JWT
+│   ├── deps.py              # get_current_user
 │   ├── routers/
-│   │   ├── v1.py         # /api/v1 router (health + versioned routes)
-│   │   ├── auth.py       # Register, login, logout, me
-│   │   ├── posts.py      # Create and list posts
-│   │   ├── comments.py   # Comments and replies
-│   │   └── likes.py      # Like/unlike and who-liked (via likes router)
+│   │   ├── auth.py
+│   │   ├── posts.py
+│   │   ├── comments.py
+│   │   └── likes.py
 │   ├── services/
-│   │   └── cloudinary.py # Image upload helper
-│   └── models/
-│       ├── user.py       # User model (auth)
-│       ├── post.py       # Post model
-│       ├── comment.py    # Comment + reply model
-│       └── like.py       # Polymorphic likes
+│   │   ├── cloudinary.py
+│   │   ├── likes.py
+│   │   └── access.py
+│   ├── models/
+│   └── schemas/
+├── railway.toml             # Railway deploy config
+├── Procfile
 ├── requirements.txt
 └── .env.example
 ```
+
+## Design decisions
+
+- **JWT in httpOnly cookies** instead of localStorage — reduces XSS token theft risk; requires correct CORS + cookie flags in production.
+- **Cloudinary** for post images and avatars — keeps the API stateless for file storage.
+- **Polymorphic likes table** — one like model for posts and comments.
+- **Private posts** — filtered at query time so only the author sees their private content.
+- **Pagination** — offset/limit on posts and likes for scalable reads.
+
+## Environment variables
+
+| Variable | Description |
+|----------|-------------|
+| `FRONTEND_URL` | Primary frontend origin for CORS fallback |
+| `CORS_ALLOWED_ORIGINS` | Comma-separated browser origins allowed by CORS |
+| `DATABASE_URL` | PostgreSQL connection string |
+| `JWT_SECRET` | Token signing secret |
+| `COOKIE_SECURE` | `true` in production (HTTPS) |
+| `COOKIE_SAMESITE` | `lax` locally; `none` for cross-domain deploys |
+| `CLOUDINARY_*` | Image upload credentials |
+| `MAX_UPLOAD_SIZE_MB` | Max upload size (default `5`) |
+
+Railway injects `PORT` automatically — the start command binds to it.
