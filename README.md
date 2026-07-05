@@ -81,10 +81,10 @@ fastapi dev app/main.py
 | `FRONTEND_URL` | `https://your-app.vercel.app` | Primary frontend origin |
 | `CORS_ALLOWED_ORIGINS` | `https://your-app.vercel.app` | Comma-separated if you have preview URLs too |
 | `COOKIE_SECURE` | `true` | Required over HTTPS |
-| `COOKIE_SAMESITE` | `none` | Required when frontend and API are on different domains |
+| `COOKIE_SAMESITE` | `lax` | Use with the Vercel API proxy (same-origin cookies) |
 | `CLOUDINARY_*` | from Cloudinary dashboard | Required for uploads |
 
-Set the frontend `NEXT_PUBLIC_API_URL` to your Railway public URL (e.g. `https://your-api.up.railway.app`).
+On Vercel, set `API_PROXY_TARGET` to this Railway public URL (e.g. `https://your-api.up.railway.app`). The frontend proxies `/api/v1/*` to the backend so auth cookies are set on the Vercel domain.
 
 ### CORS
 
@@ -98,14 +98,16 @@ COOKIE_SECURE=false
 COOKIE_SAMESITE=lax
 ```
 
-For Vercel + Railway:
+For Vercel + Railway (with frontend API proxy):
 
 ```env
 FRONTEND_URL=https://your-app.vercel.app
 CORS_ALLOWED_ORIGINS=https://your-app.vercel.app
 COOKIE_SECURE=true
-COOKIE_SAMESITE=none
+COOKIE_SAMESITE=lax
 ```
+
+The frontend rewrites `/api/v1/*` to Railway via `API_PROXY_TARGET`, so the browser only talks to the Vercel origin. Do not set `NEXT_PUBLIC_API_URL` to the Railway URL in production.
 
 ## Database migrations
 
@@ -200,7 +202,7 @@ backend/
 
 ## Design decisions
 
-- **JWT in httpOnly cookies** instead of localStorage — reduces XSS token theft risk; requires correct CORS + cookie flags in production.
+- **JWT in httpOnly cookies** instead of localStorage — reduces XSS token theft risk; the Vercel frontend proxies API requests so cookies stay on the frontend domain in production.
 - **Cloudinary** for post images and avatars — keeps the API stateless for file storage.
 - **Polymorphic likes table** — one like model for posts and comments.
 - **Private posts** — filtered at query time so only the author sees their private content.
@@ -215,7 +217,7 @@ backend/
 | `DATABASE_URL` | PostgreSQL connection string |
 | `JWT_SECRET` | Token signing secret |
 | `COOKIE_SECURE` | `true` in production (HTTPS) |
-| `COOKIE_SAMESITE` | `lax` locally; `none` for cross-domain deploys |
+| `COOKIE_SAMESITE` | `lax` (local and proxied Vercel deploy) |
 | `CLOUDINARY_*` | Image upload credentials |
 | `MAX_UPLOAD_SIZE_MB` | Max upload size (default `5`) |
 
