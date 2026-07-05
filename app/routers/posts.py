@@ -13,7 +13,7 @@ from app.models.enums import LikeTargetType, PostVisibility
 from app.models.post import Post
 from app.models.user import User
 from app.schemas.post import PostListResponse, PostResponse
-from app.services.cloudinary import upload_post_image
+from app.services.cloudinary import delete_post_image, upload_post_image
 from app.services.likes import get_like_counts, get_liked_by_me
 
 router = APIRouter(tags=["posts"])
@@ -138,3 +138,30 @@ def list_posts(
         offset=offset,
         has_more=offset + len(items) < total,
     )
+
+
+@router.delete("/{post_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_post(
+    post_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> None:
+    post = db.get(Post, post_id)
+    if not post:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Post not found.",
+        )
+
+    if post.author_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only delete your own posts.",
+        )
+
+    if post.image_public_id:
+        delete_post_image(post.image_public_id, settings)
+
+    db.delete(post)
+    db.commit()
