@@ -1,7 +1,7 @@
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -107,8 +107,6 @@ def list_likes(
         Like.target_id == target_id,
     )
 
-    total = db.scalar(select(func.count()).select_from(Like).where(*base_filter)) or 0
-
     rows = db.execute(
         select(Like, User)
         .join(User, User.id == Like.user_id)
@@ -128,8 +126,8 @@ def list_likes(
 
     return LikeListResponse(
         items=items,
-        total=total,
+        total=offset + len(items),
         limit=limit,
         offset=offset,
-        has_more=offset + len(items) < total,
+        has_more=len(items) == limit,
     )

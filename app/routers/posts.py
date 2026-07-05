@@ -20,6 +20,7 @@ router = APIRouter(tags=["posts"])
 
 DEFAULT_LIMIT = 20
 MAX_LIMIT = 50
+MAX_POST_CONTENT_LENGTH = 5000
 
 
 def _build_post_response(post: Post, like_count: int, comment_count: int, liked_by_me: bool) -> PostResponse:
@@ -53,6 +54,12 @@ async def create_post(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Post must include text, an image, or both.",
+        )
+
+    if len(trimmed_content) > MAX_POST_CONTENT_LENGTH:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Post text must be {MAX_POST_CONTENT_LENGTH} characters or fewer.",
         )
 
     image_url: str | None = None
@@ -89,8 +96,6 @@ def list_posts(
         Post.author_id == current_user.id,
     )
 
-    total = db.scalar(select(func.count()).select_from(Post).where(visibility_filter)) or 0
-
     posts = db.scalars(
         select(Post)
         .where(visibility_filter)
@@ -102,7 +107,7 @@ def list_posts(
     if not posts:
         return PostListResponse(
             items=[],
-            total=total,
+            total=0,
             limit=limit,
             offset=offset,
             has_more=False,
@@ -133,10 +138,10 @@ def list_posts(
 
     return PostListResponse(
         items=items,
-        total=total,
+        total=offset + len(items),
         limit=limit,
         offset=offset,
-        has_more=offset + len(items) < total,
+        has_more=len(items) == limit,
     )
 
 
