@@ -9,7 +9,12 @@ from app.deps import get_current_user
 from app.models.comment import Comment
 from app.models.enums import LikeTargetType
 from app.models.user import User
-from app.schemas.comment import CommentCreateRequest, CommentListResponse, CommentResponse
+from app.schemas.comment import (
+    CommentCreateRequest,
+    CommentDeleteResponse,
+    CommentListResponse,
+    CommentResponse,
+)
 from app.services.access import get_visible_post
 from app.services.likes import get_like_counts, get_liked_by_me
 
@@ -48,6 +53,14 @@ def _build_comment_tree(
                 parent.replies.append(node)
 
     return roots
+
+
+def _count_comment_subtree(db: Session, comment_id: uuid.UUID) -> int:
+    total = 1
+    child_ids = db.scalars(select(Comment.id).where(Comment.parent_id == comment_id)).all()
+    for child_id in child_ids:
+        total += _count_comment_subtree(db, child_id)
+    return total
 
 
 @router.get("/{post_id}/comments", response_model=CommentListResponse)
@@ -112,3 +125,34 @@ def create_comment(
         liked_by_me=False,
         replies=[],
     )
+
+
+@router.delete("/{post_id}/comments/{comment_id}", response_model=CommentDeleteResponse)
+def delete_comment(
+    post_id: uuid.UUID,
+    comment_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> CommentDeleteResponse:
+    post = get_visible_post(post_id, current_user, db)
+
+    comment = db.get(Comment, comment_id)
+    if not comment or comment.post_id != post_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Comment not found.",
+        )
+
+    is_comment_author = comment.author_id == current_user.id
+    is_post_author = post.author_id == current_user.id
+    if not is_comment_author and not is_post_author:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only delete your own comments or comments on your posts.",
+        )
+
+    deleted_count = _count_comment_subtree(db, comment_id)
+    db.delete(comment)
+    db.commit()
+
+    return CommentDeleteResponse(deleted_count=deleted_count)

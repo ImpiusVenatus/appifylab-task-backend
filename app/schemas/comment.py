@@ -29,3 +29,7 @@ class CommentResponse(BaseModel):
 class CommentListResponse(BaseModel):
     items: list[CommentResponse]
     total: int
+
+
+class CommentDeleteResponse(BaseModel):
+    deleted_count: int
