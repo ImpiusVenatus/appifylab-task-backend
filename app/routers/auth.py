@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -9,6 +9,7 @@ from app.deps import get_current_user
 from app.models.user import User
 from app.schemas.auth import LoginRequest, RegisterRequest, UserResponse
 from app.security import create_access_token, hash_password, verify_password
+from app.services.cloudinary import delete_cloudinary_image, upload_user_avatar
 
 router = APIRouter(tags=["auth"])
 
@@ -101,4 +102,23 @@ def logout(
 
 @router.get("/me", response_model=UserResponse)
 def me(current_user: User = Depends(get_current_user)) -> User:
+    return current_user
+
+
+@router.post("/me/avatar", response_model=UserResponse)
+async def upload_avatar(
+    avatar: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> User:
+    uploaded = await upload_user_avatar(avatar, settings)
+
+    if current_user.avatar_public_id:
+        delete_cloudinary_image(current_user.avatar_public_id, settings)
+
+    current_user.avatar_url = uploaded.url
+    current_user.avatar_public_id = uploaded.public_id
+    db.commit()
+    db.refresh(current_user)
     return current_user
